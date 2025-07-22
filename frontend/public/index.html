@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Catálogo de Produtos</title>
+    <!-- TailwindCSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Biblioteca para exportar PDF -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <style>
+        .spinning { animation: spin 1s linear infinite; }
+        @keyframes spin {
+            from { transform: rotate(0deg);}
+            to { transform: rotate(360deg);}
+        }
+        /* Adicione outras customizações de estilo aqui se desejar */
+    </style>
+</head>
+<body class="bg-gray-100 font-sans flex flex-col h-screen">
+
+    <!-- Overlay de Carregamento -->
+    <div id="loading-overlay" class="fixed hidden inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div class="flex flex-col items-center">
+            <svg class="w-16 h-16 text-white spinning" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/>
+            </svg>
+            <p class="text-white text-lg mt-4">Atualizando dados...</p>
+        </div>
+    </div>
+
+    <!-- Barra de Navegação Superior -->
+    <header class="bg-white shadow-md z-30">
+        <div class="container mx-auto px-4 sm:px-6 py-3 flex items-center">
+            <button id="refresh-button" title="Atualizar dados" class="p-2 rounded-full text-green-600 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition-colors">
+                <svg class="w-6 h-6" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/>
+                </svg>
+            </button>
+            <nav class="flex items-center space-x-2 sm:space-x-4 ml-4">
+                <a href="#" id="nav-pesquisar" class="nav-link px-3 sm:px-4 py-2 rounded-lg text-sm sm:text-base text-gray-700 hover:bg-gray-100 transition-colors">Pesquisar Produto</a>
+                <a href="#" id="nav-estoque" class="nav-link px-3 sm:px-4 py-2 rounded-lg text-sm sm:text-base text-gray-700 hover:bg-gray-100 transition-colors">Gerenciar Estoque</a>
+                <a href="#" id="nav-requisicoes" class="nav-link px-3 sm:px-4 py-2 rounded-lg text-sm sm:text-base text-gray-700 hover:bg-gray-100 transition-colors">Requisições</a>
+                <a href="#" id="nav-conferencia-nfe" class="nav-link px-3 sm:px-4 py-2 rounded-lg text-sm sm:text-base text-gray-700 hover:bg-gray-100 transition-colors">Conferência NFe</a>
+            </nav>
+        </div>
+    </header>
+
+    <!-- Barra de Filtro Global -->
+    <div id="global-filter-bar" class="bg-gray-50 p-4 border-b border-gray-200 shadow-sm z-20 hidden">
+        <div class="container mx-auto flex flex-col space-y-4">
+            <div class="flex flex-col sm:flex-row items-center space-y-4 sm:space-y-0 sm:space-x-4">
+                <input type="text" id="global-search-input" placeholder="Buscar por código ou descrição..." class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 hidden">
+                <div class="relative w-full sm:w-48" id="global-filter-menu-container">
+                    <button id="global-filter-button" class="flex items-center justify-between w-full px-4 py-2 border border-gray-300 rounded-lg bg-white text-left focus:outline-none focus:ring-2 focus:ring-blue-500 hidden">
+                        <span id="global-filter-button-label">Filtros</span>
+                        <svg class="w-5 h-5 text-gray-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" /></svg>
+                    </button>
+                    <div id="global-filter-dropdown" class="absolute hidden w-72 mt-1 bg-white border border-gray-200 rounded-lg shadow-xl z-20">
+                        <div id="global-category-checkboxes" class="p-4 space-y-2 text-sm"></div>
+                    </div>
+                </div>
+            </div>
+            <div id="stock-actions" class="flex flex-col sm:flex-row items-center justify-between w-full space-y-2 sm:space-y-0 sm:space-x-4 hidden">
+                <div id="selected-items-count" class="text-sm text-gray-700 w-full sm:w-auto text-center sm:text-left">
+                    Itens selecionados: 0
+                </div>
+                <button id="generate-report-button" class="px-4 py-2 bg-blue-600 text-white rounded-lg shadow-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed w-full sm:w-auto">
+                    Gerar Relatório
+                </button>
+            </div>
+            <div id="requisition-actions" class="hidden"></div>
+        </div>
+    </div>
+
+    <!-- Barra de ações do relatório -->
+    <div id="report-action-bar" class="report-action-bar-style hidden">
+        <div class="left-buttons">
+            <button id="report-back-btn" class="px-4 py-2 bg-gray-300 text-gray-800 rounded-lg shadow-md hover:bg-gray-400 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 transition-colors">
+                Voltar
+            </button>
+        </div>
+        <div class="right-buttons">
+            <button id="report-launch-btn" class="px-4 py-2 bg-green-600 text-white rounded-lg shadow-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition-colors">
+                Lançar Requisição
+            </button>
+            <button id="report-print-btn" class="px-4 py-2 bg-blue-600 text-white rounded-lg shadow-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors">
+                Imprimir
+            </button>
+        </div>
+    </div>
+
+    <!-- Páginas principais -->
+    <div class="flex-grow overflow-hidden">
+        <!-- Pesquisa de produto -->
+        <main id="page-pesquisar-produto" class="hidden h-full">
+            <div class="flex flex-col md:flex-row h-full">
+                <div id="product-list-container" class="w-full md:w-1/3 max-w-md border-r border-gray-300 bg-white flex flex-col h-full overflow-y-auto"></div>
+                <div id="product-details-container" class="w-full md:w-2/3 p-8 overflow-y-auto">
+                    <div id="details-placeholder" class="flex items-center justify-center h-full">
+                        <div class="text-center text-gray-500">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" /></svg>
+                            <h2 class="mt-2 text-xl font-medium">Selecione um produto</h2>
+                            <p class="mt-1 text-sm">Os detalhes aparecerão aqui.</p>
+                        </div>
+                    </div>
+                    <div id="product-details" class="hidden"></div>
+                </div>
+            </div>
+        </main>
+        <!-- Gerenciar estoque -->
+        <main id="page-gerenciar-estoque" class="hidden p-8 h-full overflow-y-auto"></main>
+        <!-- Visão geral de requisições -->
+        <main id="page-overview-requisitions" class="hidden p-8 h-full overflow-y-auto bg-gray-100 flex flex-col items-center text-center">
+            <h1 class="text-4xl font-bold text-gray-800 mb-6">Diagnóstico de Requisição</h1>
+            <p class="text-lg text-gray-600 mb-8">Visão geral das suas requisições:</p>
+            <div id="requisition-overview-cards" class="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-8 w-full max-w-4xl"></div>
+            <p id="no-orders-message" class="text-center text-gray-500 py-8 hidden">Nenhum pedido encontrado.</p>
+        </main>
+        <!-- Conferência NFE -->
+        <main id="page-conferencia-nfe" class="hidden p-8 h-full overflow-y-auto bg-gray-100 flex flex-col items-center text-center">
+            <h1 class="text-4xl font-bold text-gray-800 mb-6">Conferência de Notas Fiscais</h1>
+            <p class="text-lg text-gray-600 mb-8">Visão geral das suas notas fiscais por loja:</p>
+            <div id="nfe-overview-cards" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8 w-full max-w-6xl"></div>
+            <p id="no-nfe-message-overview" class="text-center text-gray-500 py-8 hidden">Nenhuma nota fiscal encontrada.</p>
+        </main>
+        <!-- Relatório de produtos selecionados -->
+        <main id="page-report" class="hidden p-8 h-full overflow-y-auto bg-gray-100">
+            <div id="page-report-content" class="container mx-auto mt-4"></div>
+        </main>
+    </div>
+
+    <!-- MODAIS -->
+    <!-- Modal: Lista de Pedidos - Terceiros -->
+    <div id="terceiros-orders-modal" class="fixed hidden inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div class="bg-white p-6 rounded-lg shadow-xl max-w-5xl w-full max-h-[90vh] overflow-y-auto relative">
+            <div class="modal-header flex items-center justify-between">
+                <div class="left-content">
+                    <h2 id="orders-table-title" class="text-3xl font-bold text-gray-800">Lista de Pedidos - Terceiros</h2>
+                    <button id="print-orders-table-btn" class="px-4 py-2 bg-blue-600 text-white rounded-lg shadow-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors">
+                        Imprimir Tabela
+                    </button>
+                </div>
+                <button id="close-terceiros-orders-modal-btn" class="text-gray-500 hover:text-gray-800">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+            </div>
+            <div id="consolidated-orders-table-container-modal" class="w-full space-y-4 text-left flex-grow flex flex-col">
+                <div class="flex flex-col sm:flex-row items-center space-y-4 sm:space-y-0 sm:space-x-4">
+                    <input type="text" id="orders-search-input" placeholder="Buscar por Código, Descrição ou Requisição..." class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <div class="relative w-full sm:w-48" id="orders-filter-menu-container">
+                        <button id="orders-filter-button" class="flex items-center justify-between w-full px-4 py-2 border border-gray-300 rounded-lg bg-white text-left focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            <span id="orders-filter-button-label">Filtros de Status</span>
+                            <svg class="w-5 h-5 text-gray-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" /></svg>
+                        </button>
+                        <div id="orders-filter-dropdown" class="absolute hidden w-72 mt-1 bg-white border border-gray-200 rounded-lg shadow-xl z-20">
+                            <div id="orders-status-checkboxes" class="p-4 space-y-2 text-sm">
+                                <label class="flex items-center space-x-3 p-2 rounded-md hover:bg-gray-100 cursor-pointer">
+                                    <input type="checkbox" class="order-status-checkbox h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500" value="dentro_prazo">
+                                    <span class="flex-grow text-gray-700">Pedidos Dentro do Prazo</span>
+                                </label>
+                                <label class="flex items-center space-x-3 p-2 rounded-md hover:bg-gray-100 cursor-pointer">
+                                    <input type="checkbox" class="order-status-checkbox h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500" value="fora_prazo">
+                                    <span class="flex-grow text-gray-700">Pedidos Fora do Prazo</span>
+                                </label>
+                                <label class="flex items-center space-x-3 p-2 rounded-md hover:bg-gray-100 cursor-pointer">
+                                    <input type="checkbox" class="order-status-checkbox h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500" value="entregues">
+                                    <span class="flex-grow text-gray-700">Pedidos Entregues</span>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div id="orders-table-content" class="bg-white rounded-lg shadow-md overflow-y-auto overflow-x-auto max-h-[60vh] mt-4 flex-grow"></div>
+                <p id="no-orders-message-modal" class="text-center text-gray-500 py-8 hidden">Nenhum pedido encontrado.</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de Detalhes do Pedido -->
+    <div id="order-details-modal" class="fixed hidden inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div class="bg-white p-6 rounded-lg shadow-xl max-w-3xl w-full max-h-[90vh] overflow-y-auto relative">
+            <button id="close-order-modal-btn" class="absolute top-3 right-3 text-gray-500 hover:text-gray-800">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+            </button>
+            <h2 id="modal-order-title" class="text-2xl font-bold text-gray-800 mb-4">Detalhes do Pedido</h2>
+            <div id="modal-order-content"></div>
+        </div>
+    </div>
+
+    <!-- Modal de Mensagem Genérico -->
+    <div id="message-modal" class="fixed hidden inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[75]">
+        <div class="bg-white p-6 rounded-lg shadow-xl max-w-sm w-full text-center relative">
+            <button id="close-message-modal-btn" class="absolute top-3 right-3 text-gray-500 hover:text-gray-800">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+            </button>
+            <h3 id="message-modal-title" class="text-xl font-bold mb-4"></h3>
+            <p id="message-modal-content" class="text-gray-700 mb-6"></p>
+            <button id="message-modal-ok-btn" class="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                Ok
+            </button>
+        </div>
+    </div>
+
+    <!-- Modal de Lançar Requisição -->
+    <div id="launch-requisition-modal" class="fixed hidden inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div class="bg-white p-6 rounded-lg shadow-xl max-w-md w-full text-center relative">
+            <button id="close-launch-modal-btn" class="absolute top-3 right-3 text-gray-500 hover:text-gray-800">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+            </button>
+            <h3 class="text-2xl font-bold mb-4 text-gray-800">Lançar Requisição</h3>
+            <p id="launch-modal-message" class="text-gray-700 mb-6"></p>
+            <div class="mb-6">
+                <label for="phoenix-requisition-code" class="block text-left text-gray-700 text-sm font-bold mb-2">
+                    Código da Requisição do Phoenix:
+                </label>
+                <input type="text" id="phoenix-requisition-code" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" placeholder="Ex: REQ12345">
+            </div>
+            <div class="flex justify-end space-x-4">
+                <button id="cancel-launch-btn" class="px-6 py-2 bg-gray-300 text-gray-800 rounded-lg hover:bg-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-500">
+                    Cancelar
+                </button>
+                <button id="confirm-launch-btn" class="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500">
+                    Confirmar Lançamento
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de Impressão -->
+    <div id="print-table-modal" class="fixed hidden inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60] p-4">
+        <div class="bg-white p-6 rounded-lg shadow-xl max-w-5xl w-full max-h-[90vh] overflow-y-auto relative">
+            <div class="modal-header">
+                <h2 class="text-2xl font-bold text-gray-800">Pré-visualização para Impressão</h2>
+                <div class="header-buttons">
+                    <button id="cancel-print-btn" class="px-6 py-2 bg-gray-300 text-gray-800 rounded-lg hover:bg-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-500">
+                        Cancelar
+                    </button>
+                    <button id="confirm-print-btn" class="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                        Imprimir para PDF
+                    </button>
+                </div>
+            </div>
+            <div id="print-modal-content" class="overflow-x-auto"></div>
+        </div>
+    </div>
+
+    <!-- Modal de Confirmação Genérica -->
+    <div id="confirmation-modal" class="fixed hidden inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[70]">
+        <div class="bg-white p-6 rounded-lg shadow-xl max-w-sm w-full text-center relative">
+            <h3 id="confirmation-modal-title" class="text-xl font-bold mb-4"></h3>
+            <p id="confirmation-modal-content" class="text-gray-700 mb-6"></p>
+            <div class="flex justify-end space-x-4">
+                <button id="confirm-no-btn" class="px-6 py-2 bg-gray-300 text-gray-800 rounded-lg hover:bg-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-500">
+                    Não
+                </button>
+                <button id="confirm-yes-btn" class="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    Sim
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de Detalhes da NFE -->
+    <div id="nfe-details-modal" class="fixed hidden inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div class="bg-white p-6 rounded-lg shadow-xl max-w-5xl w-full max-h-[90vh] overflow-y-auto relative">
+            <div class="modal-header flex items-center justify-between">
+                <div class="left-content">
+                    <h2 id="nfe-modal-title" class="text-3xl font-bold text-gray-800">Notas Fiscais</h2>
+                    <button id="print-nfe-modal-table-btn" class="px-4 py-2 bg-blue-600 text-white rounded-lg shadow-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors">
+                        Imprimir Tabela
+                    </button>
+                </div>
+                <button id="close-nfe-modal-btn" class="text-gray-500 hover:text-gray-800">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+            </div>
+            <div class="w-full space-y-4 text-left flex-grow flex flex-col">
+                <div class="flex flex-col sm:flex-row items-center space-y-4 sm:space-y-0 sm:space-x-4">
+                    <input type="text" id="nfe-modal-search-input" placeholder="Buscar por Número, Fornecedor, Status..." class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                </div>
+                <div id="nfe-modal-table-content" class="bg-white rounded-lg shadow-md overflow-y-auto overflow-x-auto max-h-[60vh] mt-4 flex-grow"></div>
+                <p id="no-nfe-message-modal" class="text-center text-gray-500 py-8 hidden">Nenhuma nota fiscal encontrada.</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Script principal (módulo) -->
+    <script type="module" src="../src/main.js"></script>
+</body>
+</html>
