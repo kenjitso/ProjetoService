@@ -4,5 +4,24 @@ export const state = {
     nfe: [],
     selectedStockItems: new Set(),
     reportQuantities: new Map(),
-    // ... outros estados globais, se necessário
+    stockState: {
+        statusFilter: 'todos',
+        currentPage: 1,
+        itemsPerPage: 15,
+        sortColumn: 'descricao',
+        sortDirection: 'asc'
+    },
+    ordersTableState: {
+        searchTerm: '',
+        sortColumn: 'descricao',
+        sortDirection: 'asc',
+        selectedType: 'terceiros',
+        statusFilters: new Set()
+    },
+    nfeTableState: {
+        searchTerm: '',
+        sortColumn: 'numero_da_nota',
+        sortDirection: 'asc',
+        currentStoreFilter: 'todos'
+    }
 };
