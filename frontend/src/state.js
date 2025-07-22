@@ -6,6 +6,11 @@ export const state = {
     ordersTerceiros: [],        // Pedidos de terceiros
     ordersFabrica: [],          // (caso implemente no futuro)
     nfe: [],                    // Notas fiscais eletrônicas
+    itemsToPrint: [],          // para o modal de impressão
+    loading: false,            // para overlay global
+    globalSearchTerm: '',      // para busca global
+    globalCategoryFilters: [], // para filtros globais
+    currentPage: 'pesquisar',  // para controle de navegação SPA
 
     // Conjunto de IDs dos produtos selecionados para relatório ou outra ação
     selectedStockItems: new Set(),
