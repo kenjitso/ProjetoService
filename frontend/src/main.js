@@ -1,6 +1,7 @@
 import { fetchProducts, fetchOrdersTerceiros, fetchNFe } from './api.js';
 import { state } from './state.js';
 import * as components from './components.js';
+import { debounce, filterProducts } from './utils.js';
 
 // --- Função auxiliar para mostrar/esconder páginas ---
 function showPage(pageId) {
@@ -73,13 +74,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     };
 
     // --- Buscas e filtros globais ---
-    document.getElementById('global-search-input').oninput = (e) => {
-        // Exemplo: filtrar produtos e atualizar lista
+    const applyGlobalFilters = debounce((e) => {
         const term = e.target.value.toLowerCase();
-        const filtered = state.products.filter(p =>
-            (p.codigo && p.codigo.toLowerCase().includes(term)) ||
-            (p.descricao && p.descricao.toLowerCase().includes(term))
-        );
+        const filtered = filterProducts(state.products, term);
         if (!document.getElementById('page-pesquisar-produto').classList.contains('hidden')) {
             components.renderProductList(filtered, document.getElementById('product-list-container'), (id, el) => {
                 const prod = filtered.find(p => p.id === id);
@@ -89,7 +86,8 @@ document.addEventListener('DOMContentLoaded', async () => {
             });
         }
         // Adapte para estoque, etc.
-    };
+    }, 300);
+    document.getElementById('global-search-input').oninput = applyGlobalFilters;
 
     // --- Exemplo: botão gerar relatório ---
     document.getElementById('generate-report-button').onclick = () => {

@@ -4,6 +4,23 @@
 // Todas as funções de renderização de UI, cards, tabelas, listas, modais, tooltips, status, contadores, etc.
 // Você pode dividir esse arquivo em mais arquivos no futuro se ficar muito grande, mas aqui está o essencial para adaptar seu código antigo.
 
+import {
+    formatCurrency,
+    formatDate,
+    formatCnpjCpf,
+    paginate,
+    sortBy,
+    filterProducts,
+    filterByTerm,
+    showTooltip,
+    hideTooltip,
+    processRawOrdersData,
+    exportToPDF,
+    addBusinessDays,
+    getBusinessDaysDifference,
+    uniqueId,
+} from './utils.js';
+
 // =====================
 // HELPERS DE HTML
 // =====================
@@ -67,7 +84,7 @@ export function renderProductDetails(product, container) {
     let html = `<h1 class="text-3xl font-bold text-gray-800 mb-2">${product.descricao}</h1>
         <p class="text-md text-gray-500 mb-6">Código: ${product.codigo}</p>
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">`;
-    html += createDetailItem('Preço', (product.preco || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }));
+    html += createDetailItem('Preço', formatCurrency(product.preco));
     html += createDetailItem('Estoque', product.estoque || '0');
     html += createDetailItem('Situação', product.situacao ? '<span class="text-green-600 font-semibold">Ativo</span>' : '<span class="text-red-600 font-semibold">Inativo</span>');
     html += createDetailItem('Marca', product.marca);
@@ -108,7 +125,11 @@ export function renderTable(headers, rows, container, options = {}) {
     rows.forEach(row => {
         html += "<tr>";
         headers.forEach(header => {
-            html += `<td class="px-6 py-4">${row[header.key] ?? ""}</td>`;
+            let value = row[header.key];
+            if (header.format === 'currency') value = formatCurrency(value);
+            else if (header.format === 'date') value = formatDate(value);
+            else if (header.format === 'cnpjcpf') value = formatCnpjCpf(value);
+            html += `<td class="px-6 py-4">${value ?? ""}</td>`;
         });
         html += "</tr>";
     });
@@ -164,6 +185,7 @@ export function setupCustomTooltip() {
     return tooltip;
 }
 export function showProductTooltip(event, fullDescription, imageUrl) {
+    // Usa o utilitário showTooltip para posicionamento e animação
     const tooltip = setupCustomTooltip();
     let tooltipContent = `<p class="text-sm text-gray-800 mb-2">${fullDescription}</p>`;
     if (imageUrl && imageUrl !== 'N/A') {
@@ -171,24 +193,11 @@ export function showProductTooltip(event, fullDescription, imageUrl) {
     } else {
         tooltipContent += `<img src="https://placehold.co/128x128/e0e0e0/555555?text=Sem+Imagem" alt="Sem Imagem" class="w-32 h-32 object-cover rounded-md mx-auto mt-2">`;
     }
-    tooltip.innerHTML = tooltipContent;
-    tooltip.classList.remove('hidden');
-    tooltip.style.opacity = '0';
-    const offsetX = 15, offsetY = 15;
-    let top = event.pageY + offsetY;
-    let left = event.pageX + offsetX;
-    if (left + tooltip.offsetWidth > window.innerWidth + window.scrollY) left = event.pageX - tooltip.offsetWidth - offsetX;
-    if (top + tooltip.offsetHeight > window.innerHeight + window.scrollY) top = event.pageY - tooltip.offsetHeight - offsetY;
-    tooltip.style.top = `${top}px`;
-    tooltip.style.left = `${left}px`;
-    setTimeout(() => { tooltip.style.opacity = '1'; }, 10);
+    showTooltip(tooltip, tooltipContent, event);
 }
 export function hideProductTooltip() {
     const tooltip = document.getElementById('custom-product-tooltip');
-    if (tooltip) {
-        tooltip.style.opacity = '0';
-        setTimeout(() => { tooltip.classList.add('hidden'); }, 200);
-    }
+    if (tooltip) hideTooltip(tooltip);
 }
 
 // =====================
